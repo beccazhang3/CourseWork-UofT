@@ -1,0 +1,200 @@
+---
+title: "STA442 Homework2-Mixed Effect Models"
+author: "Yingzhu Zhang"
+date: "16/10/2019"
+output: 
+  pdf_document: default
+---
+# 1. Math
+
+## Report
+
+In this analysis on MathAchieve dataset, we investigated whether the mathematics achievement scores of students have differences within schools nearly as big as the differences between students from different schools. We treated School as a random effect, since we were interested in the differences in mathematics achievement scores between specific schools. If we were just interested in controlling it to see the differences within one school only, then fixed effect will be more appropriate. The fixed effects in this model are Minority (whether a student is a minority racial group), Sex (female or male), and SES (socio-economic status). Additionaly, the normality of the data is confirmed by the Q-Q Plot below as we can see there is no systmetic deviation.
+
+```{r, echo=TRUE, include=FALSE}
+# Load the dataset
+data("MathAchieve", package = "MEMSS"); attach(MathAchieve)
+library(nlme)
+```
+
+```{r, echo=FALSE}
+model1 <- lme(MathAch ~ Minority + Sex + SES, random=~1|School, data=MathAchieve)
+qqnorm(model1, main = "Normal Q-Q Plot")
+```
+
+We fitted the mixed effect model and carried out the analysis treating School as a random effect. The results for the fixed effects were summarized in Table 1. To find whether the difference between schools are greater than within school, we need to check the random effect. In the summary of the model, we found that the standard deviation between school is 1.92, whereas the standard deviation within is 5.99. After calculating the variances by squaring the standard deviations, we can say that only 9.28% of the variance was explained by the random factor.
+
+```{r, echo=FALSE}
+tab<-summary(model1)$tTable[,]
+tab = round(tab,2)
+knitr::kable(tab, caption = "Estimation of fixed effects in 
+             linear mixed model of math achievement dataset")
+```
+
+Hence, we conclude that the differences between schools are not greater than what can be explained by within-school variation. In another word, the math achievement score does not variate much for the students from different schools but does deviate more within one school.
+
+# 2. Drugs
+
+```{r, echo=TRUE, include=FALSE}
+# drugs data
+library(Matrix)
+library(sp)
+library(parallel)
+library(raster)
+library(Pmisc)
+library(data.table)
+library(Hmisc)
+
+# load the dataset
+download.file("http://pbrown.ca/teaching/appliedstats/data/drugs.rds",
+              "drugs.rds")
+xSub = readRDS("drugs.rds")
+
+table(xSub$SUB1)
+table(xSub$STFIPS)[1:5]
+table(xSub$TOWN)[1:2]
+
+forInla = na.omit(xSub)
+forInla$y = as.numeric(forInla$completed)
+library("INLA")
+ires = inla(y ~ SUB1 + GENDER + raceEthnicity + homeless + AGE +
+              f(STFIPS, hyper=list(prec=list(prior='pc.prec', param=c(0.1, 0.05)))) + 
+              f(TOWN, hyper=list(prec=list(prior='pc.prec', param=c(0.1, 0.05)))),
+            data=forInla, family='binomial', 
+            control.inla = list(strategy='gaussian', int.strategy='eb'))
+```
+
+## Introduction
+
+We analyzed the Treatment Episode Data Set – Discharges, the dataset provides annual data on the number and characteristics of persons discharged from public and private substance abuse treatment programs that receive public funding. We wanted to test the hypothesis that chance of a young person completing their drug treatment with ‘hard’ drugs (Heroin, Opiates, Methamphetamine, Cocaine) being more difficult to treat than alcohol or marijuana. Another hypothesis is that some American states have particularly effective treatment programs whereas other states have programs which are highly problematic with very low completion rates. In this analysis using R-studio, we fitted the Generalized Linear Mixed Model and treated SUB1 (types of drugs) and TOWN (American states) as random effects. Finally, by checking the completion rates, we can further investigate the above hypothesis.
+
+## Methods
+
+The following plot shows the distribution of the posteriors and penalized complexity prior.
+
+* The posterior probability is this case is the odds of a young man completes his drug treatment.
+* The penalized complexity prior probability is some uncertain events, in this case, the types of drug that the individual is addicted to, or the location (states) of the treatment program.
+
+```{r, echo=FALSE}
+sdState = Pmisc::priorPostSd(ires)
+do.call(matplot, sdState$STFIPS$matplot)
+do.call(legend, sdState$legend)
+```
+
+In this analysis, we treated SUB1 and TOWN as a random effect to see the odds of a young man complete the treatment, and the completion rate in different American states. Mathematically, the GLMM model is described as:
+
+$$Y_i\sim Bernoulli(\lambda_i)$$
+$$logit(\lambda_i)=X_i\beta+U_i+V_i$$
+$$U_{i} \sim i.i.d.\mathrm{N}(0, \sigma^2_{U})$$
+$$V_{ij} \sim i.i.d.\mathrm{N}(0, \sigma^2_{V})$$
+
+where:
+
+* $Y_i$ = the chance of a young man i completes the drug treatment, hence the completion rate
+* $X_i\beta$ = the fixed effect where $X_i$ is the indicator variables
+* $U_i$ = SUB1(types of drugs) as an individual-level random effect
+* $V_i$ = TOWN (American states) as an individual-level random effect
+
+Additionally, the null hypothesis ($H_0$) for the first hypothesis test is that the completion rates for all kinds of drugs are the same, the alternative hypothesis ($H_a$) is that one of the completion rate deviates among other drugs. Correspondingly, $H_0$ for the second test is that the completion rates for all states are the same, $H_a$ is that one of the completion rate deviates among other states.
+
+To interpret the result, we know that the posteriors for the fixed effects tend to be approximately normal so there is little difference between mean, median and mode. The posterior means indicate the odd of a young man complete treatment programs, hence the completion rate. By comparing the mean of each variables, we can determine whether the hypothesis is correct.
+
+## Results
+
+```{r, echo=FALSE}
+toPrint = as.data.frame(rbind(exp(ires$summary.fixed[, c(4, 3, 5)]), 
+                              sdState$summary[, c(4, 3, 5)]))
+sss = "^(raceEthnicity|SUB1|GENDER|homeless|SD)(.[[:digit:]]+.[[:space:]]+| for )?"
+toPrint = cbind(variable = gsub(paste0(sss, ".*"), "\\1", rownames(toPrint)), 
+                category = substr(gsub(sss, "", rownames(toPrint)), 1, 25), toPrint)
+Pmisc::mdTable(toPrint, digits = 3, mdToTex = TRUE, guessGroup = TRUE, 
+               caption = "Posterior means and quantiles for model parameters.")
+ires$summary.random$STFIPS$ID = gsub("[[:punct:]]|[[:digit:]]", "", 
+                                     ires$summary.random$STFIPS$ID)
+ires$summary.random$STFIPS$ID = gsub("DISTRICT OF COLUMBIA", "WASHINGTON DC", 
+                                     ires$summary.random$STFIPS$ID)
+toprint = cbind(ires$summary.random$STFIPS[1:26, c(1,2, 4, 6)], 
+                ires$summary.random$STFIPS[-(1:26),c(1, 2, 4, 6)])
+```
+
+As shown in Table 2 above, the completion rate for alcohol addiction is 1.609 at the 0.5 quantile. Since marijuana is the reference group, the completion rate for it is 1.0. Comparing to other ‘hard’ drugs, for example, the chance of an individual addicted to heroin complete the treatment is only 0.872 and for cocaine is 0.855, which are significantly lower than alcohol and marijuana.
+
+```{r, echo=FALSE}
+colnames(toprint) = gsub("uant", "", colnames(toprint))
+knitr::kable(toprint, digits = 1, format = "latex")
+```
+
+In Table 3 above, the positive mean represents a positive completion rate, indicating an effective treatment program in the state, whereas the negative represents a problematic program. In the total of 52 states, 58% (30 states) of them have a positive completion rate. Furthermore, Florida has one of the highest completion rates, which is 1.0. On the contrary, the completion rates in Virginia is only -2.9.
+
+## Conclusion
+
+By conducting the GLMM analysis, we can conclude that the chance for a young person who has alcohol addiction completing the treatment is twice as high as those who have ‘hard’ drugs addiction. The reasoning behind this result is probably treatment for drug addiction is more timeconsuming than alcohol addiction. People who are addicted to drugs have more severe effects and tend to need more attention comparing to those who addicted to alcohol. Hence, the process of healing a drug addiction is more challenging.
+
+The effectiveness of treatment varies depending on which state it’s located, and there are still 42% of the states are running ineffective programs. States like Florida, Delaware, and Massachusetts have the highest completion rates, probably due to their accessible and diversified drugs rehab centers. Whereas Virginia, New Mexico, and North California have the lowest rates, showing problematic and ineffective programs.
+
+\newpage
+## Appendix
+
+```{r, eval=FALSE, echo=TRUE, result='hide'}
+# Load the dataset
+data("MathAchieve", package = "MEMSS"); attach(MathAchieve)
+library(nlme)
+# Model 1
+model1 <- lme(MathAch ~ Minority + Sex + SES, random=~1|School, data=MathAchieve)
+qqnorm(model1, main = "Normal Q-Q Plot")
+tab<-summary(model1)$tTable[,]
+tab = round(tab,2)
+knitr::kable(tab, caption = "Estimation of fixed effects in 
+             linear mixed model of math achievement dataset")
+# sigma U = 1.916676, sigma E = 5.992412
+# Proportion of variance explained by School
+1.916676^2 / (1.916676^2 + 5.992412^2)
+
+# drugs data
+library(Matrix)
+library(sp)
+library(parallel)
+library(raster)
+library(Pmisc)
+library(data.table)
+library(Hmisc)
+
+# load the dataset
+download.file("http://pbrown.ca/teaching/appliedstats/data/drugs.rds",
+              "drugs.rds")
+xSub = readRDS("drugs.rds")
+
+table(xSub$SUB1)
+table(xSub$STFIPS)[1:5]
+table(xSub$TOWN)[1:2]
+
+forInla = na.omit(xSub)
+forInla$y = as.numeric(forInla$completed)
+library("INLA")
+ires = inla(y ~ SUB1 + GENDER + raceEthnicity + homeless + AGE +
+              f(STFIPS, hyper=list(prec=list(prior='pc.prec', param=c(0.1, 0.05)))) + 
+              f(TOWN, hyper=list(prec=list(prior='pc.prec', param=c(0.1, 0.05)))),
+            data=forInla, family='binomial', 
+            control.inla = list(strategy='gaussian', int.strategy='eb'))
+            
+sdState = Pmisc::priorPostSd(ires)
+do.call(matplot, sdState$STFIPS$matplot)
+do.call(legend, sdState$legend)
+
+toPrint = as.data.frame(rbind(exp(ires$summary.fixed[, c(4, 3, 5)]), 
+                              sdState$summary[, c(4, 3, 5)]))
+sss = "^(raceEthnicity|SUB1|GENDER|homeless|SD)(.[[:digit:]]+.[[:space:]]+| for )?"
+toPrint = cbind(variable = gsub(paste0(sss, ".*"), "\\1", rownames(toPrint)), 
+                category = substr(gsub(sss, "", rownames(toPrint)), 1, 25), toPrint)
+Pmisc::mdTable(toPrint, digits = 3, mdToTex = TRUE, guessGroup = TRUE, 
+               caption = "Posterior means and quantiles for model parameters.")
+ires$summary.random$STFIPS$ID = gsub("[[:punct:]]|[[:digit:]]", "", 
+                                     ires$summary.random$STFIPS$ID)
+ires$summary.random$STFIPS$ID = gsub("DISTRICT OF COLUMBIA", "WASHINGTON DC", 
+                                     ires$summary.random$STFIPS$ID)
+toprint = cbind(ires$summary.random$STFIPS[1:26, c(1,2, 4, 6)], 
+                ires$summary.random$STFIPS[-(1:26),c(1, 2, 4, 6)])
+colnames(toprint) = gsub("uant", "", colnames(toprint))
+knitr::kable(toprint, digits = 1, format = "latex")
+```
+
