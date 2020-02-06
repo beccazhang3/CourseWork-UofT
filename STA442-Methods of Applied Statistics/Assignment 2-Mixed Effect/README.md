@@ -16,7 +16,7 @@ I learned the following things:
 ## Software Used
 * This project was done in R, the report was rendered into LaTeX using RMarkdown.
 * I used the following R packages:
-	- nlme to fit Random Effects Models.
+	- nlme to fit Mixed Effects Models.
 
 ## How to Use
 * Knit ```STA442 HW2.Rmd``` to generate the report.
