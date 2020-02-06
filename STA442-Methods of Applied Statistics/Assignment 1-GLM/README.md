@@ -20,4 +20,4 @@ I learned the following things:
 	- knitr to generate visually appealing tables.
 
 ## How to Use
-* Knit STA442HW1.Rmd to generate the report.
+* Knit '''STA442 HW1.Rmd''' to generate the report.
