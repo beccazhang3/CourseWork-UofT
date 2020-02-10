@@ -19,4 +19,6 @@ I learned the following things:
 	- nlme to fit Mixed Effects Models.
 
 ## How to Use
+* Read ```homework2.pdf``` for assignment questions.
 * Knit ```STA442 HW2.Rmd``` to generate the report.
+* ```STA442-HW2.pdf``` is the generated report in PDF form.
