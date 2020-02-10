@@ -20,4 +20,7 @@ I learned the following things:
 	- knitr to generate visually appealing tables.
 
 ## How to Use
+* Read ```homework1.pdf``` for assignment questions.
 * Knit ```STA442 HW1.Rmd``` to generate the report.
+* ```STA442-HW1.pdf``` is the generated report in PDF form.
+
