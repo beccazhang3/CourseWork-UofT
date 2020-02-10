@@ -21,4 +21,6 @@ I learned the following things:
   - survival to comduct survival analysis.
 
 ## How to Use
-* Knit ```STA2201 A4.Rmd``` to generate the report.
+* Read ```homework4.pdf``` for assignment questions.
+* Knit ```STA442 HW4.Rmd``` to generate the report.
+* ```STA442-HW4.pdf``` is the generated report in PDF form.
